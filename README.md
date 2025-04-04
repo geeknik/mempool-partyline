@@ -138,7 +138,7 @@ You can modify this file directly or run the setup wizard again.
 ## Security Considerations
 
 - **Encryption Password**: All users must share the same encryption password to communicate
-- **Transaction Costs**: Each message requires a small Bitcoin transaction fee
+- **Transaction Costs**: Each message may require a small Bitcoin transaction fee
 - **Privacy**: While messages are encrypted, the fact that you're sending/receiving data via OP_RETURN is visible on the blockchain
 - **Ephemeral**: Messages only exist in the mempool until the transaction is confirmed
 
