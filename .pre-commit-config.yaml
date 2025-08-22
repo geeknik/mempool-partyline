@@ -1,0 +1,97 @@
+# Pre-commit hooks for code quality and security
+# Install: pip install pre-commit && pre-commit install
+
+repos:
+  # Security scanning
+  - repo: https://github.com/PyCQA/bandit
+    rev: '1.7.5'
+    hooks:
+      - id: bandit
+        args: ['-ll', '--recursive', 'partyline/']
+        exclude: 'tests/'
+
+  # Code formatting
+  - repo: https://github.com/psf/black
+    rev: '23.12.1'
+    hooks:
+      - id: black
+        language_version: python3.11
+        args: ['--line-length=100']
+
+  # Linting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 'v0.1.9'
+    hooks:
+      - id: ruff
+        args: ['--fix']
+
+  # Type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: 'v1.8.0'
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - types-requests
+          - types-pyzmq
+          - pydantic
+        args: ['--ignore-missing-imports']
+
+  # YAML validation
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 'v4.5.0'
+    hooks:
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # Secret detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: 'v1.4.0'
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: 'v0.38.0'
+    hooks:
+      - id: markdownlint
+        args: ['--fix']
+
+  # Requirements validation
+  - repo: https://github.com/peterdemin/pip-compile-multi
+    rev: 'v2.6.3'
+    hooks:
+      - id: pip-compile-multi-verify
+
+# Global excludes
+exclude: |
+  (?x)^(
+    \.git/|
+    \.mypy_cache/|
+    \.pytest_cache/|
+    \.venv/|
+    venv/|
+    __pycache__/|
+    build/|
+    dist/|
+    \.eggs/|
+    .*\.egg-info/
+  )
+
+# Configuration
+default_language_version:
+  python: python3.11
+
+ci:
+  autofix_prs: true
+  autoupdate_schedule: weekly

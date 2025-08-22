@@ -1,0 +1,44 @@
+# Core dependencies
+python-bitcoinrpc>=1.0
+pyzmq>=25.0.0
+
+# Cryptography - modern and secure
+cryptography>=41.0.0
+PyNaCl>=1.5.0
+argon2-cffi>=23.1.0
+pycryptodome>=3.19.0  # For legacy compatibility
+
+# Key management and security
+keyring>=24.0.0
+python-dotenv>=1.0.0
+
+# Data validation and typing
+pydantic>=2.5.0
+typing-extensions>=4.9.0
+
+# Network and proxy support
+PySocks>=1.7.1
+requests[socks]>=2.31.0
+
+# Testing and quality assurance
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+hypothesis>=6.92.0
+pytest-mock>=3.12.0
+
+# Security analysis
+bandit[toml]>=1.7.5
+pip-audit>=2.6.0
+safety>=3.0.0
+
+# Code quality and formatting
+black>=23.12.0
+ruff>=0.1.9
+mypy>=1.8.0
+types-requests>=2.31.0
+types-pyzmq>=25.1.0
+
+# Development tools
+pre-commit>=3.6.0
+ipython>=8.19.0
