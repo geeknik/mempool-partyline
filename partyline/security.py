@@ -13,6 +13,18 @@ import resource
 from typing import Optional, Union, Any
 from pathlib import Path
 
+# Try to import enhanced hardening module
+try:
+    from partyline.opsec.hardening import (
+        ProcessHardening as _ProcessHardening,
+        MemoryProtection as _EnhancedMemoryProtection,
+        initialize_hardening
+    )
+    _enhanced_available = True
+except ImportError:
+    _enhanced_available = False
+    initialize_hardening = None
+
 logger = logging.getLogger(__name__)
 
 
