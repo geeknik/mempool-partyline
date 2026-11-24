@@ -3,7 +3,7 @@ Process hardening and memory protection
 Implements various security measures to protect against memory attacks
 """
 
-import ctypes
+import atexit
 import gc
 import logging
 import os
@@ -11,8 +11,8 @@ import platform
 import resource
 import signal
 import sys
-from typing import Optional, Any, Callable
-import atexit
+from collections.abc import Callable
+from typing import Any
 
 from partyline.logging_sec import log_security_event
 
@@ -25,7 +25,7 @@ class ProcessHardening:
     """
     
     @staticmethod
-    def enable_all(config: Optional[Any] = None) -> bool:
+    def enable_all(config: Any | None = None) -> bool:
         """
         Enable all available hardening measures
         
@@ -92,7 +92,7 @@ class ProcessHardening:
                     libc = ctypes.CDLL(ctypes.util.find_library("c"))
                     PR_SET_DUMPABLE = 4
                     libc.prctl(PR_SET_DUMPABLE, 0)
-                except Exception:
+                except (OSError, AttributeError):
                     pass
             
             return True
@@ -112,7 +112,6 @@ class ProcessHardening:
             
             # PR_SET_PTRACER
             PR_SET_PTRACER = 0x59616d61
-            PR_SET_PTRACER_ANY = -1
             
             # Restrict ptrace to parent only
             libc.prctl(PR_SET_PTRACER, 0)
@@ -245,7 +244,7 @@ class ProcessHardening:
         atexit.register(cleanup)
     
     @staticmethod
-    def drop_privileges(user: Optional[str] = None, group: Optional[str] = None) -> bool:
+    def drop_privileges(user: str | None = None, group: str | None = None) -> bool:
         """
         Drop process privileges to specified user/group
         
@@ -261,8 +260,8 @@ class ProcessHardening:
             return False
         
         try:
-            import pwd
             import grp
+            import pwd
             
             # Get current IDs
             current_uid = os.getuid()
@@ -308,7 +307,7 @@ class MemoryProtection:
     """
     
     @staticmethod
-    def lock_memory(data: bytes, size: Optional[int] = None) -> bool:
+    def lock_memory(data: bytes, size: int | None = None) -> bool:
         """
         Lock memory pages to prevent swapping
         
@@ -325,7 +324,7 @@ class MemoryProtection:
             return MemoryProtection._lock_memory_posix(data, size)
     
     @staticmethod
-    def _lock_memory_posix(data: bytes, size: Optional[int] = None) -> bool:
+    def _lock_memory_posix(data: bytes, size: int | None = None) -> bool:
         """Lock memory on POSIX systems"""
         try:
             import ctypes.util
@@ -350,7 +349,7 @@ class MemoryProtection:
             return False
     
     @staticmethod
-    def _lock_memory_windows(data: bytes, size: Optional[int] = None) -> bool:
+    def _lock_memory_windows(data: bytes, size: int | None = None) -> bool:
         """Lock memory on Windows"""
         try:
             import ctypes
@@ -381,7 +380,7 @@ class MemoryProtection:
             return False
     
     @staticmethod
-    def unlock_memory(data: bytes, size: Optional[int] = None) -> bool:
+    def unlock_memory(data: bytes, size: int | None = None) -> bool:
         """
         Unlock previously locked memory
         
@@ -398,7 +397,7 @@ class MemoryProtection:
             return MemoryProtection._unlock_memory_posix(data, size)
     
     @staticmethod
-    def _unlock_memory_posix(data: bytes, size: Optional[int] = None) -> bool:
+    def _unlock_memory_posix(data: bytes, size: int | None = None) -> bool:
         """Unlock memory on POSIX systems"""
         try:
             import ctypes.util
@@ -416,7 +415,7 @@ class MemoryProtection:
             return False
     
     @staticmethod
-    def _unlock_memory_windows(data: bytes, size: Optional[int] = None) -> bool:
+    def _unlock_memory_windows(data: bytes, size: int | None = None) -> bool:
         """Unlock memory on Windows"""
         try:
             import ctypes
@@ -540,7 +539,7 @@ class ProtectedString:
             self._value = None
             self._bytes = None
             
-        except Exception:
+        except (OSError, AttributeError):
             pass  # Best effort
 
 
@@ -569,8 +568,8 @@ class SecureExecutor:
             TimeoutError: If execution times out
             MemoryError: If memory limit exceeded
         """
-        import threading
         import queue
+        import threading
         
         result_queue = queue.Queue()
         exception_queue = queue.Queue()
@@ -614,7 +613,7 @@ class SecureExecutor:
 
 
 # Module initialization
-def initialize_hardening(config: Optional[Any] = None):
+def initialize_hardening(config: Any | None = None):
     """
     Initialize all hardening measures
     

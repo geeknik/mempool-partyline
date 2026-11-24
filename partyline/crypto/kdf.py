@@ -7,26 +7,37 @@ import hashlib
 import hmac
 import logging
 import secrets
-from typing import Optional, Tuple, Union
 from dataclasses import dataclass
 
-from argon2 import PasswordHasher, Type as Argon2Type
+from argon2 import PasswordHasher
+from argon2 import Type as Argon2Type
 from argon2.low_level import hash_secret_raw
-from Crypto.Protocol.KDF import PBKDF2
-from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+from Crypto.Protocol.KDF import PBKDF2  # nosec B413 - deprecated, used only for v1 legacy compat
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 from partyline.constants import (
-    KDFSuite,
-    ARGON2_TIME_COST,
     ARGON2_MEMORY_COST,
     ARGON2_PARALLELISM,
+    ARGON2_TIME_COST,
     DEFAULT_KDF_ITERATIONS,
-    MIN_SALT_LENGTH,
+    KDF_REGISTRY,
     MAX_SALT_LENGTH,
+    MIN_SALT_LENGTH,
+    SUPPORTED_KDF_ALGORITHMS,
+    KDFSuite,
 )
 
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    "KDF_REGISTRY",
+    "SUPPORTED_KDF_ALGORITHMS",
+    "KDFParams",
+    "SecureKDF",
+    "hkdf_derive",
+    "zeroize",
+]
 
 
 @dataclass
@@ -34,10 +45,10 @@ class KDFParams:
     """Parameters for key derivation"""
     kdf_suite: KDFSuite
     salt: bytes
-    iterations: Optional[int] = None
-    memory_cost: Optional[int] = None
-    time_cost: Optional[int] = None
-    parallelism: Optional[int] = None
+    iterations: int | None = None
+    memory_cost: int | None = None
+    time_cost: int | None = None
+    parallelism: int | None = None
     
     def to_dict(self) -> dict:
         """Serialize to dictionary for encoding"""
@@ -85,7 +96,7 @@ class SecureKDF:
                 salt_len=16
             )
     
-    def generate_salt(self, length: Optional[int] = None) -> bytes:
+    def generate_salt(self, length: int | None = None) -> bytes:
         """
         Generate cryptographically secure random salt
         
@@ -105,11 +116,11 @@ class SecureKDF:
     
     def derive_key(
         self,
-        password: Union[str, bytes],
-        salt: Optional[bytes] = None,
+        password: str | bytes,
+        salt: bytes | None = None,
         key_length: int = 32,
         **kwargs
-    ) -> Tuple[bytes, KDFParams]:
+    ) -> tuple[bytes, KDFParams]:
         """
         Derive key from password using configured KDF
         
@@ -152,10 +163,10 @@ class SecureKDF:
         password: bytes,
         salt: bytes,
         key_length: int,
-        time_cost: Optional[int] = None,
-        memory_cost: Optional[int] = None,
-        parallelism: Optional[int] = None
-    ) -> Tuple[bytes, KDFParams]:
+        time_cost: int | None = None,
+        memory_cost: int | None = None,
+        parallelism: int | None = None
+    ) -> tuple[bytes, KDFParams]:
         """Derive key using Argon2id"""
         time_cost = time_cost or ARGON2_TIME_COST
         memory_cost = memory_cost or ARGON2_MEMORY_COST
@@ -188,8 +199,8 @@ class SecureKDF:
         password: bytes,
         salt: bytes,
         key_length: int,
-        iterations: Optional[int] = None
-    ) -> Tuple[bytes, KDFParams]:
+        iterations: int | None = None
+    ) -> tuple[bytes, KDFParams]:
         """Derive key using PBKDF2-HMAC-SHA256"""
         iterations = iterations or DEFAULT_KDF_ITERATIONS
         
@@ -218,7 +229,7 @@ class SecureKDF:
         n: int = 16384,  # CPU/memory cost
         r: int = 8,      # Block size
         p: int = 1       # Parallelization
-    ) -> Tuple[bytes, KDFParams]:
+    ) -> tuple[bytes, KDFParams]:
         """Derive key using Scrypt"""
         kdf = Scrypt(
             salt=salt,
@@ -244,7 +255,7 @@ class SecureKDF:
     
     @staticmethod
     def verify_key(
-        password: Union[str, bytes],
+        password: str | bytes,
         params: KDFParams,
         expected_key: bytes
     ) -> bool:
@@ -300,8 +311,8 @@ class SecureKDF:
 def hkdf_derive(
     input_key: bytes,
     length: int = 32,
-    salt: Optional[bytes] = None,
-    info: Optional[bytes] = None
+    salt: bytes | None = None,
+    info: bytes | None = None
 ) -> bytes:
     """
     HKDF key derivation for session keys
@@ -334,7 +345,7 @@ def hkdf_derive(
     return hkdf.derive(input_key)
 
 
-def zeroize(data: Union[bytes, bytearray]) -> None:
+def zeroize(data: bytes | bytearray) -> None:
     """
     Best-effort memory zeroization
     

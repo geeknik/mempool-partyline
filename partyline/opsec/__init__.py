@@ -2,39 +2,28 @@
 Operational Security (OpSec) components
 """
 
-from partyline.opsec.identity import (
-    IdentityManager,
-    IdentityKeys,
-    SessionKeys
-)
-
-from partyline.opsec.config import (
-    SecureConfig,
-    ConfigValidator
-)
-
+from partyline.opsec.config import ConfigValidator, SecureConfig
 from partyline.opsec.hardening import (
-    ProcessHardening,
     MemoryProtection,
+    ProcessHardening,
     ProtectedString,
     SecureExecutor,
-    initialize_hardening
+    initialize_hardening,
 )
+from partyline.opsec.identity import IdentityKeys, IdentityManager, SessionKeys
 
 __all__ = [
+    'ConfigValidator',
+    'IdentityKeys',
     # Identity management
     'IdentityManager',
-    'IdentityKeys', 
-    'SessionKeys',
-    
-    # Configuration
-    'SecureConfig',
-    'ConfigValidator',
-    
+    'MemoryProtection',
     # Hardening
     'ProcessHardening',
-    'MemoryProtection',
     'ProtectedString',
+    # Configuration
+    'SecureConfig',
     'SecureExecutor',
+    'SessionKeys',
     'initialize_hardening'
 ]

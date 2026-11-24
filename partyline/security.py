@@ -3,23 +3,20 @@ Process hardening and memory protection
 Implements defense-in-depth security measures at the OS level
 """
 
-import os
-import sys
-import platform
-import logging
-import secrets
 import ctypes
+import logging
+import os
+import platform
 import resource
-from typing import Optional, Union, Any
+import secrets
 from pathlib import Path
+from typing import Any
 
 # Try to import enhanced hardening module
 try:
-    from partyline.opsec.hardening import (
-        ProcessHardening as _ProcessHardening,
-        MemoryProtection as _EnhancedMemoryProtection,
-        initialize_hardening
-    )
+    from partyline.opsec.hardening import MemoryProtection as _EnhancedMemoryProtection  # noqa: F401
+    from partyline.opsec.hardening import ProcessHardening as _ProcessHardening  # noqa: F401
+    from partyline.opsec.hardening import initialize_hardening
     _enhanced_available = True
 except ImportError:
     _enhanced_available = False
@@ -31,7 +28,7 @@ logger = logging.getLogger(__name__)
 class SecurityManager:
     """Manages process-level security hardening"""
     
-    def __init__(self, config: Optional[Any] = None):
+    def __init__(self, config: Any | None = None):
         """
         Initialize security manager
         
@@ -115,7 +112,7 @@ class SecurityManager:
                     try:
                         resource.setrlimit(resource.RLIMIT_MEMLOCK, (65536, hard))
                         logger.debug("Increased RLIMIT_MEMLOCK")
-                    except:
+                    except (ValueError, OSError):
                         pass
             
             # Note: Actual mlock() calls should be done on specific memory regions
@@ -129,7 +126,7 @@ class SecurityManager:
         """Set restrictive umask for file creation"""
         try:
             old_umask = os.umask(0o077)  # rwx------
-            self._applied_hardening.append(f"umask_0o077")
+            self._applied_hardening.append("umask_0o077")
             logger.debug(f"Set umask from {oct(old_umask)} to 0o077")
         except Exception as e:
             logger.warning(f"Could not set umask: {e}")
@@ -165,7 +162,7 @@ class SecurityManager:
             try:
                 libc.prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY)
                 self._applied_hardening.append("no_ptrace")
-            except:
+            except (OSError, AttributeError):
                 pass
             
             # Set SECCOMP if available (requires additional setup)
@@ -201,7 +198,7 @@ class MemoryProtection:
     """Memory protection utilities"""
     
     @staticmethod
-    def lock_memory(data: bytes, size: Optional[int] = None) -> bool:
+    def lock_memory(data: bytes, size: int | None = None) -> bool:
         """
         Attempt to lock memory region to prevent swapping
         
@@ -242,7 +239,7 @@ class MemoryProtection:
         return False
     
     @staticmethod
-    def unlock_memory(data: bytes, size: Optional[int] = None) -> bool:
+    def unlock_memory(data: bytes, size: int | None = None) -> bool:
         """
         Unlock previously locked memory
         
@@ -279,7 +276,7 @@ class MemoryProtection:
         return False
     
     @staticmethod
-    def secure_zero(data: Union[bytes, bytearray, memoryview]) -> None:
+    def secure_zero(data: bytes | bytearray | memoryview) -> None:
         """
         Securely zero memory
         
@@ -301,7 +298,7 @@ class MemoryProtection:
         try:
             import nacl.bindings
             nacl.bindings.sodium_memzero(data)
-        except:
+        except (ImportError, AttributeError):
             pass
         
         # Force garbage collection
@@ -420,7 +417,7 @@ def secure_delete_file(filepath: Path, passes: int = 3) -> bool:
         # Try regular deletion as fallback
         try:
             filepath.unlink()
-        except:
+        except (OSError, PermissionError):
             pass
         return False
 

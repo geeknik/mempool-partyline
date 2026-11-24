@@ -6,21 +6,19 @@ Supports multiple personas with key rotation
 import hashlib
 import logging
 import time
-from pathlib import Path
-from typing import Optional, Dict, Any, Tuple, List
 from dataclasses import dataclass, field
 
-import nacl.signing
-import nacl.public
+import nacl.bindings
 import nacl.encoding
 import nacl.hash
-import nacl.bindings
+import nacl.public
+import nacl.signing
 
-from partyline.crypto.keyring_store import get_keyring_store
+from partyline.constants import KEY_ROTATION_DAYS
 from partyline.crypto.kdf import hkdf_derive, zeroize
-from partyline.security import SecureRandom, MemoryProtection
-from partyline.constants import KEY_ROTATION_DAYS, MessageType
+from partyline.crypto.keyring_store import get_keyring_store
 from partyline.logging_sec import log_security_event
+from partyline.security import MemoryProtection, SecureRandom
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +32,7 @@ class IdentityKeys:
     encryption_key: nacl.public.PrivateKey
     public_key: nacl.public.PublicKey
     created_at: float = field(default_factory=time.time)
-    rotated_at: Optional[float] = None
+    rotated_at: float | None = None
     message_count: int = 0
     
     def get_identity_hash(self) -> str:
@@ -76,10 +74,10 @@ class SessionKeys:
     session_id: str
     ephemeral_private: nacl.public.PrivateKey
     ephemeral_public: nacl.public.PublicKey
-    peer_public: Optional[nacl.public.PublicKey] = None
-    shared_secret: Optional[bytes] = None
-    sending_chain: Optional[bytes] = None
-    receiving_chain: Optional[bytes] = None
+    peer_public: nacl.public.PublicKey | None = None
+    shared_secret: bytes | None = None
+    sending_chain: bytes | None = None
+    receiving_chain: bytes | None = None
     send_counter: int = 0
     recv_counter: int = 0
     created_at: float = field(default_factory=time.time)
@@ -87,7 +85,7 @@ class SessionKeys:
     def derive_shared_secret(self, peer_public_key: nacl.public.PublicKey) -> bytes:
         """Derive shared secret via ECDH"""
         self.peer_public = peer_public_key
-        box = nacl.public.Box(self.ephemeral_private, peer_public_key)
+        nacl.public.Box(self.ephemeral_private, peer_public_key)
         
         # Use the raw shared secret for further KDF
         # NaCl's Box includes its own KDF, but we want raw ECDH output
@@ -165,9 +163,9 @@ class IdentityManager:
             keyring_store: Optional keyring store instance
         """
         self.keyring = keyring_store or get_keyring_store()
-        self.identities: Dict[str, IdentityKeys] = {}
-        self.sessions: Dict[str, SessionKeys] = {}
-        self.current_persona: Optional[str] = None
+        self.identities: dict[str, IdentityKeys] = {}
+        self.sessions: dict[str, SessionKeys] = {}
+        self.current_persona: str | None = None
     
     def generate_identity(self, persona: str = "default") -> IdentityKeys:
         """
@@ -250,7 +248,7 @@ class IdentityManager:
         
         return success
     
-    def load_identity(self, persona: str, password: str) -> Optional[IdentityKeys]:
+    def load_identity(self, persona: str, password: str) -> IdentityKeys | None:
         """
         Load identity from keyring
         
@@ -311,7 +309,7 @@ class IdentityManager:
             return True
         return False
     
-    def get_current_identity(self) -> Optional[IdentityKeys]:
+    def get_current_identity(self) -> IdentityKeys | None:
         """Get current persona's identity"""
         if self.current_persona:
             return self.identities.get(self.current_persona)
@@ -343,11 +341,11 @@ class IdentityManager:
         logger.debug(f"Created session {session_id[:8]}...")
         return session
     
-    def get_session(self, session_id: str) -> Optional[SessionKeys]:
+    def get_session(self, session_id: str) -> SessionKeys | None:
         """Get session by ID"""
         return self.sessions.get(session_id)
     
-    def rotate_identity(self, persona: str, password: str) -> Optional[IdentityKeys]:
+    def rotate_identity(self, persona: str, password: str) -> IdentityKeys | None:
         """
         Rotate identity keys for a persona
         
@@ -385,7 +383,7 @@ class IdentityManager:
         
         return None
     
-    def export_public_identity(self, persona: str) -> Optional[Dict[str, str]]:
+    def export_public_identity(self, persona: str) -> dict[str, str] | None:
         """
         Export public keys for sharing
         
@@ -407,7 +405,7 @@ class IdentityManager:
             "created_at": str(identity.created_at)
         }
     
-    def import_peer_identity(self, peer_data: Dict[str, str]) -> Tuple[nacl.signing.VerifyKey, nacl.public.PublicKey]:
+    def import_peer_identity(self, peer_data: dict[str, str]) -> tuple[nacl.signing.VerifyKey, nacl.public.PublicKey]:
         """
         Import peer's public identity
         

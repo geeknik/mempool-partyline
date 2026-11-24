@@ -3,18 +3,19 @@ Secure key storage using OS keyring
 Manages identity keys with encryption and backup support
 """
 
+import base64
 import json
 import logging
-import keyring
-import base64
-from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
-from partyline.crypto.kdf import SecureKDF, KDFParams, zeroize
-from partyline.crypto.aead import get_preferred_cipher
-from partyline.security import SecureRandom, secure_delete_file
+import keyring
+
 from partyline.constants import CipherSuite, KDFSuite
+from partyline.crypto.aead import get_preferred_cipher
+from partyline.crypto.kdf import KDFParams, SecureKDF, zeroize
+from partyline.security import secure_delete_file
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +30,11 @@ class KeyBundle:
     version: int = 2
     persona: str = "default"
     cipher_suite: CipherSuite = CipherSuite.AES_256_GCM
-    kdf_params: Dict[str, Any] = field(default_factory=dict)
+    kdf_params: dict[str, Any] = field(default_factory=dict)
     nonce: str = ""  # Base64
     ciphertext: str = ""  # Base64
     tag: str = ""  # Base64
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     
     def to_json(self) -> str:
         """Serialize to JSON for storage"""
@@ -99,7 +100,7 @@ class KeyringStore:
         persona: str,
         identity_seed: bytes,
         password: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: dict[str, Any] | None = None
     ) -> bool:
         """
         Store encrypted identity seed in keyring
@@ -155,7 +156,7 @@ class KeyringStore:
         self,
         persona: str,
         password: str
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         """
         Retrieve and decrypt identity seed from keyring
         
@@ -236,7 +237,7 @@ class KeyringStore:
         try:
             # Try to enumerate (not supported by all backends)
             import keyring.backends
-            kr = keyring.get_keyring()
+            keyring.get_keyring()
             
             # This is a hack and may not work on all platforms
             # Better to maintain a separate index
@@ -302,7 +303,7 @@ class KeyringStore:
         self,
         import_path: Path,
         password: str,
-        new_persona: Optional[str] = None
+        new_persona: str | None = None
     ) -> bool:
         """
         Import encrypted key bundle from file
@@ -365,7 +366,7 @@ class FileBackedStore(KeyringStore):
     Uses encrypted files with secure permissions
     """
     
-    def __init__(self, storage_dir: Optional[Path] = None):
+    def __init__(self, storage_dir: Path | None = None):
         """
         Initialize file-backed store
         
@@ -395,7 +396,7 @@ class FileBackedStore(KeyringStore):
         persona: str,
         identity_seed: bytes,
         password: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: dict[str, Any] | None = None
     ) -> bool:
         """Store encrypted identity in file"""
         try:
@@ -440,7 +441,7 @@ class FileBackedStore(KeyringStore):
             logger.error(f"Failed to store identity in file: {e}")
             return False
     
-    def retrieve_identity(self, persona: str, password: str) -> Optional[bytes]:
+    def retrieve_identity(self, persona: str, password: str) -> bytes | None:
         """Retrieve identity from file"""
         try:
             key_path = self._get_key_path(persona)
@@ -499,7 +500,7 @@ class FileBackedStore(KeyringStore):
                 with open(key_file, 'r') as f:
                     bundle = KeyBundle.from_json(f.read())
                     personas.append(bundle.persona)
-            except:
+            except (OSError, ValueError):
                 continue
         return personas
 

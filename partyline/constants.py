@@ -2,7 +2,7 @@
 Protocol constants and security defaults for Mempool Partyline
 """
 
-from enum import IntEnum, Enum
+from enum import Enum, IntEnum
 from typing import Final
 
 # Protocol versioning
@@ -103,3 +103,35 @@ LEGACY_PROTOCOL_WARNING = """
 - No identity management
 Please upgrade to protocol v2 for improved security.
 """
+
+# Supported cipher suites (preference order)
+SUPPORTED_CIPHERS: Final[list[CipherSuite]] = [
+    CipherSuite.XCHACHA20_POLY1305,
+    CipherSuite.AES_256_GCM,
+    CipherSuite.AES_256_EAX,
+    CipherSuite.CHACHA20_POLY1305,
+]
+
+# Supported key derivation functions (preference order)
+SUPPORTED_KDF_ALGORITHMS: Final[list[KDFSuite]] = [
+    KDFSuite.ARGON2ID,
+    KDFSuite.PBKDF2_SHA256,
+    KDFSuite.SCRYPT,
+]
+
+# Registry mappings for negotiation
+CIPHER_REGISTRY: dict[str, CipherSuite] = {
+    'XCHACHA20_POLY1305': CipherSuite.XCHACHA20_POLY1305,
+    'AES_256_GCM': CipherSuite.AES_256_GCM,
+    'AES_256_EAX': CipherSuite.AES_256_EAX,
+    'CHACHA20_POLY1305': CipherSuite.CHACHA20_POLY1305,
+}
+
+KDF_REGISTRY: dict[str, KDFSuite] = {
+    'ARGON2ID': KDFSuite.ARGON2ID,
+    'PBKDF2_SHA256': KDFSuite.PBKDF2_SHA256,
+    'SCRYPT': KDFSuite.SCRYPT,
+}
+
+# Minimum password length for secure keys
+MIN_PASSWORD_LENGTH: Final[int] = 8

@@ -2,13 +2,12 @@
 Cryptographic modules for Mempool Partyline
 """
 
-from partyline.crypto.kdf import SecureKDF, KDFParams, hkdf_derive, zeroize
 from partyline.crypto.aead import (
     AEADCipher,
-    XChaCha20Poly1305Cipher,
-    AES256GCMCipher,
     AES256EAXCipher,
+    AES256GCMCipher,
     HMACCipher,
+    XChaCha20Poly1305Cipher,
     get_cipher,
     get_preferred_cipher,
 )
@@ -16,21 +15,22 @@ from partyline.crypto.compat_legacy import (
     LegacyDecryptor,
     decrypt_v1_message,
 )
+from partyline.crypto.kdf import KDFParams, SecureKDF, hkdf_derive, zeroize
 
 __all__ = [
-    "SecureKDF",
-    "KDFParams", 
-    "hkdf_derive",
-    "zeroize",
     # AEAD
     "AEADCipher",
-    "XChaCha20Poly1305Cipher",
-    "AES256GCMCipher",
     "AES256EAXCipher",
+    "AES256GCMCipher",
     "HMACCipher",
-    "get_cipher",
-    "get_preferred_cipher",
+    "KDFParams",
     # Legacy
     "LegacyDecryptor",
+    "SecureKDF",
+    "XChaCha20Poly1305Cipher",
     "decrypt_v1_message",
+    "get_cipher",
+    "get_preferred_cipher",
+    "hkdf_derive",
+    "zeroize",
 ]

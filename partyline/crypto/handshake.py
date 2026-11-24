@@ -4,28 +4,24 @@ Implements secure parameter negotiation between peers
 """
 
 import hashlib
-import hmac
 import json
 import logging
 import time
-from dataclasses import dataclass, asdict
-from typing import Optional, Dict, Any, List, Tuple
+from dataclasses import asdict, dataclass
 from enum import Enum
+from typing import Any
 
+import nacl.encoding
 import nacl.public
 import nacl.signing
-import nacl.encoding
 
-from partyline.crypto.aead import get_cipher, CIPHER_REGISTRY
-from partyline.crypto.kdf import hkdf_derive, KDF_REGISTRY
 from partyline.constants import (
     PROTOCOL_VERSION,
-    MessageType,
-    SUPPORTED_CIPHERS,
-    SUPPORTED_KDF_ALGORITHMS
 )
-from partyline.security import SecureRandom
+from partyline.crypto.aead import CIPHER_REGISTRY
+from partyline.crypto.kdf import KDF_REGISTRY, hkdf_derive
 from partyline.logging_sec import log_security_event
+from partyline.security import SecureRandom
 
 logger = logging.getLogger(__name__)
 
@@ -43,17 +39,17 @@ class HandshakeState(Enum):
 @dataclass
 class CryptoCapabilities:
     """Cryptographic capabilities of a peer"""
-    ciphers: List[str]
-    kdfs: List[str]
-    protocol_versions: List[int]
-    features: Dict[str, bool]  # Extension features
+    ciphers: list[str]
+    kdfs: list[str]
+    protocol_versions: list[int]
+    features: dict[str, bool]  # Extension features
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return asdict(self)
     
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'CryptoCapabilities':
+    def from_dict(cls, data: dict[str, Any]) -> 'CryptoCapabilities':
         """Create from dictionary"""
         return cls(**data)
     
@@ -80,8 +76,8 @@ class HandshakeMessage:
     msg_type: str
     timestamp: float
     nonce: bytes
-    payload: Dict[str, Any]
-    signature: Optional[bytes] = None
+    payload: dict[str, Any]
+    signature: bytes | None = None
     
     def to_bytes(self) -> bytes:
         """Serialize to bytes"""
@@ -119,7 +115,7 @@ class HandshakeProtocol:
     Secure handshake protocol implementation
     """
     
-    def __init__(self, identity_manager, session_id: Optional[str] = None):
+    def __init__(self, identity_manager, session_id: str | None = None):
         """
         Initialize handshake protocol
         
@@ -135,15 +131,15 @@ class HandshakeProtocol:
         self.local_caps = CryptoCapabilities.get_local()
         
         # Negotiated parameters
-        self.peer_caps: Optional[CryptoCapabilities] = None
-        self.selected_cipher: Optional[str] = None
-        self.selected_kdf: Optional[str] = None
-        self.selected_version: Optional[int] = None
+        self.peer_caps: CryptoCapabilities | None = None
+        self.selected_cipher: str | None = None
+        self.selected_kdf: str | None = None
+        self.selected_version: int | None = None
         
         # Keys
         self.session_keys = None
-        self.peer_identity_key: Optional[nacl.public.PublicKey] = None
-        self.peer_verify_key: Optional[nacl.signing.VerifyKey] = None
+        self.peer_identity_key: nacl.public.PublicKey | None = None
+        self.peer_verify_key: nacl.signing.VerifyKey | None = None
         
         # Anti-replay
         self.seen_nonces = set()
@@ -192,7 +188,7 @@ class HandshakeProtocol:
         logger.debug(f"Created HELLO for session {self.session_id[:8]}...")
         return msg.to_bytes()
     
-    def process_hello(self, data: bytes) -> Optional[bytes]:
+    def process_hello(self, data: bytes) -> bytes | None:
         """
         Process received HELLO message
         
@@ -402,7 +398,7 @@ class HandshakeProtocol:
                 break
         
         if not self.selected_cipher and common_ciphers:
-            self.selected_cipher = sorted(common_ciphers)[0]
+            self.selected_cipher = min(common_ciphers)
         
         if not self.selected_cipher:
             logger.warning("No common ciphers")
@@ -418,7 +414,7 @@ class HandshakeProtocol:
                 break
         
         if not self.selected_kdf and common_kdfs:
-            self.selected_kdf = sorted(common_kdfs)[0]
+            self.selected_kdf = min(common_kdfs)
         
         if not self.selected_kdf:
             logger.warning("No common KDFs")
@@ -452,7 +448,7 @@ class HandshakeProtocol:
             info=b"receiving_chain"
         )
     
-    def get_negotiated_params(self) -> Optional[Dict[str, Any]]:
+    def get_negotiated_params(self) -> dict[str, Any] | None:
         """
         Get negotiated parameters after successful handshake
         
@@ -470,7 +466,7 @@ class HandshakeProtocol:
             "peer_identity": self.peer_identity_key.encode(nacl.encoding.Base64Encoder).decode() if self.peer_identity_key else None
         }
     
-    def export_session_keys(self) -> Optional[Dict[str, bytes]]:
+    def export_session_keys(self) -> dict[str, bytes] | None:
         """
         Export session keys for message encryption
         
@@ -511,10 +507,10 @@ class HandshakeManager:
             identity_manager: Identity manager instance
         """
         self.identity_manager = identity_manager
-        self.active_handshakes: Dict[str, HandshakeProtocol] = {}
-        self.established_sessions: Dict[str, Dict[str, Any]] = {}
+        self.active_handshakes: dict[str, HandshakeProtocol] = {}
+        self.established_sessions: dict[str, dict[str, Any]] = {}
     
-    def initiate_handshake(self) -> Tuple[str, bytes]:
+    def initiate_handshake(self) -> tuple[str, bytes]:
         """
         Initiate a new handshake
         
@@ -528,7 +524,7 @@ class HandshakeManager:
         
         return handshake.session_id, hello
     
-    def process_message(self, data: bytes) -> Optional[bytes]:
+    def process_message(self, data: bytes) -> bytes | None:
         """
         Process incoming handshake message
         
@@ -581,7 +577,7 @@ class HandshakeManager:
             logger.error(f"Handshake message processing failed: {e}")
             return None
     
-    def get_session(self, session_id: str) -> Optional[HandshakeProtocol]:
+    def get_session(self, session_id: str) -> HandshakeProtocol | None:
         """Get active handshake by session ID"""
         return self.active_handshakes.get(session_id)
     

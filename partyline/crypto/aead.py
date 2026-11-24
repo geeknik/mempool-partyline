@@ -7,27 +7,38 @@ import hmac
 import logging
 import secrets
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Union
 
 from partyline.constants import (
-    CipherSuite,
-    NONCE_LENGTH,
+    CIPHER_REGISTRY,
     GCM_NONCE_LENGTH,
-    TAG_LENGTH,
+    KDF_REGISTRY,
+    NONCE_LENGTH,
+    SUPPORTED_CIPHERS,
+    CipherSuite,
 )
-from partyline.crypto.kdf import zeroize
+
+__all__ = [
+    "CIPHER_REGISTRY",
+    "KDF_REGISTRY",
+    "SUPPORTED_CIPHERS",
+    "AEADCipher",
+    "AES256EAXCipher",
+    "AES256GCMCipher",
+    "HMACCipher",
+    "XChaCha20Poly1305Cipher",
+    "get_cipher",
+    "get_preferred_cipher",
+]
 
 logger = logging.getLogger(__name__)
 
 
 class CipherError(Exception):
     """Base exception for cipher operations"""
-    pass
 
 
 class AuthenticationError(CipherError):
     """Raised when message authentication fails"""
-    pass
 
 
 class AEADCipher(ABC):
@@ -37,8 +48,8 @@ class AEADCipher(ABC):
     def encrypt(
         self,
         plaintext: bytes,
-        associated_data: Optional[bytes] = None
-    ) -> Tuple[bytes, bytes, bytes]:
+        associated_data: bytes | None = None
+    ) -> tuple[bytes, bytes, bytes]:
         """
         Encrypt plaintext with authentication
         
@@ -49,7 +60,6 @@ class AEADCipher(ABC):
         Returns:
             Tuple of (nonce, ciphertext, tag)
         """
-        pass
     
     @abstractmethod
     def decrypt(
@@ -57,7 +67,7 @@ class AEADCipher(ABC):
         nonce: bytes,
         ciphertext: bytes,
         tag: bytes,
-        associated_data: Optional[bytes] = None
+        associated_data: bytes | None = None
     ) -> bytes:
         """
         Decrypt and verify ciphertext
@@ -74,13 +84,11 @@ class AEADCipher(ABC):
         Raises:
             AuthenticationError: If authentication fails
         """
-        pass
     
     @property
     @abstractmethod
     def cipher_suite(self) -> CipherSuite:
         """Return the cipher suite identifier"""
-        pass
 
 
 class XChaCha20Poly1305Cipher(AEADCipher):
@@ -108,8 +116,8 @@ class XChaCha20Poly1305Cipher(AEADCipher):
     def encrypt(
         self,
         plaintext: bytes,
-        associated_data: Optional[bytes] = None
-    ) -> Tuple[bytes, bytes, bytes]:
+        associated_data: bytes | None = None
+    ) -> tuple[bytes, bytes, bytes]:
         """Encrypt with XChaCha20-Poly1305"""
         # PyNaCl's SecretBox includes nonce and tag in the output
         # We need to separate them for our protocol
@@ -140,7 +148,7 @@ class XChaCha20Poly1305Cipher(AEADCipher):
         nonce: bytes,
         ciphertext: bytes,
         tag: bytes,
-        associated_data: Optional[bytes] = None
+        associated_data: bytes | None = None
     ) -> bytes:
         """Decrypt with XChaCha20-Poly1305"""
         # Reconstruct the format PyNaCl expects
@@ -191,8 +199,8 @@ class AES256GCMCipher(AEADCipher):
     def encrypt(
         self,
         plaintext: bytes,
-        associated_data: Optional[bytes] = None
-    ) -> Tuple[bytes, bytes, bytes]:
+        associated_data: bytes | None = None
+    ) -> tuple[bytes, bytes, bytes]:
         """Encrypt with AES-256-GCM"""
         nonce = secrets.token_bytes(GCM_NONCE_LENGTH)
         
@@ -214,7 +222,7 @@ class AES256GCMCipher(AEADCipher):
         nonce: bytes,
         ciphertext: bytes,
         tag: bytes,
-        associated_data: Optional[bytes] = None
+        associated_data: bytes | None = None
     ) -> bytes:
         """Decrypt with AES-256-GCM"""
         # Combine ciphertext and tag for cryptography library
@@ -247,7 +255,7 @@ class AES256EAXCipher(AEADCipher):
             key: 32-byte encryption key
         """
         try:
-            from Crypto.Cipher import AES
+            from Crypto.Cipher import AES  # nosec B413 - AES-EAX requires pycryptodome, used only for v1 legacy compat
             self.AES = AES
             self.key = key
             logger.debug("Initialized AES-256-EAX cipher (legacy mode)")
@@ -260,8 +268,8 @@ class AES256EAXCipher(AEADCipher):
     def encrypt(
         self,
         plaintext: bytes,
-        associated_data: Optional[bytes] = None
-    ) -> Tuple[bytes, bytes, bytes]:
+        associated_data: bytes | None = None
+    ) -> tuple[bytes, bytes, bytes]:
         """Encrypt with AES-256-EAX"""
         cipher = self.AES.new(self.key, self.AES.MODE_EAX)
         
@@ -277,7 +285,7 @@ class AES256EAXCipher(AEADCipher):
         nonce: bytes,
         ciphertext: bytes,
         tag: bytes,
-        associated_data: Optional[bytes] = None
+        associated_data: bytes | None = None
     ) -> bytes:
         """Decrypt with AES-256-EAX"""
         cipher = self.AES.new(self.key, self.AES.MODE_EAX, nonce=nonce)
@@ -315,8 +323,8 @@ class HMACCipher(AEADCipher):
         self.mac_key = key[16:]
         
         try:
-            from Crypto.Cipher import AES
-            from Crypto.Util import Counter
+            from Crypto.Cipher import AES  # nosec B413 - AES-only v1 legacy compat
+            from Crypto.Util import Counter  # nosec B413 - AES-only v1 legacy compat
             self.AES = AES
             self.Counter = Counter
             logger.debug("Initialized AES-CTR + HMAC-SHA256 fallback cipher")
@@ -326,8 +334,8 @@ class HMACCipher(AEADCipher):
     def encrypt(
         self,
         plaintext: bytes,
-        associated_data: Optional[bytes] = None
-    ) -> Tuple[bytes, bytes, bytes]:
+        associated_data: bytes | None = None
+    ) -> tuple[bytes, bytes, bytes]:
         """Encrypt then MAC"""
         # Generate nonce
         nonce = secrets.token_bytes(16)
@@ -354,7 +362,7 @@ class HMACCipher(AEADCipher):
         nonce: bytes,
         ciphertext: bytes,
         tag: bytes,
-        associated_data: Optional[bytes] = None
+        associated_data: bytes | None = None
     ) -> bytes:
         """Verify MAC then decrypt"""
         # Verify MAC first

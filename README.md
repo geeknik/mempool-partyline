@@ -8,7 +8,8 @@ Mempool Partyline enables secure, anonymous messaging by embedding encrypted mes
 
 ## Features
 
-- **End-to-end encryption** using AES with password-derived keys
+- **End-to-end encryption** using XChaCha20-Poly1305 or AES-256-GCM with AES-256-GCM as strong default
+- **Forward secrecy** via ephemeral X25519 key exchange and symmetric ratcheting
 - **Ephemeral messaging** - messages exist only in the mempool
 - **Anonymous communication** - no account registration required
 - **Multiple interfaces**:
@@ -32,8 +33,14 @@ Mempool Partyline enables secure, anonymous messaging by embedding encrypted mes
 
 ### Python Dependencies
 
-- `zmq` - ZeroMQ for real-time mempool monitoring
-- `pycryptodome` - For AES encryption
+- `cryptography` - For AES-GCM and modern KDFs
+- `PyNaCl` - For XChaCha20-Poly1305
+- `argon2-cffi` - For Argon2id key derivation
+- `keyring` - For secure key storage
+- `python-dotenv` - For environment configuration
+- `pyyaml` - For YAML config support
+- `pyzmq` - ZeroMQ for real-time mempool monitoring
+- `pycryptodome` - For legacy AES-EAX compatibility
 - `python-bitcoinrpc` - For Bitcoin Core RPC communication
 - `curses` - For the TUI interface (included in Python standard library)
 
@@ -49,7 +56,7 @@ Mempool Partyline enables secure, anonymous messaging by embedding encrypted mes
    ```
    python -m venv venv
    source venv/bin/activate
-   pip install zmq pycryptodome python-bitcoinrpc
+   pip install -r requirements.txt
    ```
 
 3. Run the setup wizard:
@@ -92,18 +99,12 @@ The first time you run Mempool Partyline, it will guide you through configuratio
 python mempool_partyline.py --setup
 ```
 
-This will:
-- Create a configuration directory
-- Prompt for Bitcoin Core RPC credentials
-- Set your preferred nickname
-- Set up encryption keys
-
 ### Running the Application
 
 #### Console UI
 
 ```
-python mempool_partyline.py
+python mempool_partyline.py --console
 ```
 
 #### Text User Interface (TUI)
@@ -115,7 +116,7 @@ python mempool_partyline.py --tui
 #### Daemon Mode (Just listen for messages)
 
 ```
-python mempool_partyline.py --daemon
+python mempool_partyline.py --listen
 ```
 
 ### Sending Messages
@@ -141,6 +142,29 @@ You can modify this file directly or run the setup wizard again.
 - **Transaction Costs**: Each message may require a small Bitcoin transaction fee
 - **Privacy**: While messages are encrypted, the fact that you're sending/receiving data via OP_RETURN is visible on the blockchain
 - **Ephemeral**: Messages only exist in the mempool until the transaction is confirmed
+- **Forward Secrecy**: Ephemeral session keys provide forward secrecy for v2 messages
+- **Memory Protection**: Keys are securely zeroized after use
+- **Process Hardening**: Core dumps are disabled and ptrace is restricted
+
+## Security Architecture
+
+For detailed information about the security architecture, threat model, and implementation details, see [docs/SECURITY.md](docs/SECURITY.md).
+
+### Cryptographic Features
+
+- **Key Derivation**: Argon2id with 64MB memory, 3 iterations, 4 parallelism; PBKDF2-SHA256 (legacy)
+- **Encryption**: XChaCha20-Poly1305 (preferred) or AES-256-GCM (strong default) with AEAD
+- **Identity**: Ed25519 signing keys with X25519 ephemeral encryption keys
+- **Forward Secrecy**: X25519 ECDH + HKDF + symmetric ratcheting
+- **Key Rotation**: Automatic rotation after time/message thresholds
+- **Message Padding**: Bucketized sizes for traffic analysis resistance
+
+### Operational Security
+
+- **Secure Logging**: Automatic redaction of secrets and sensitive data
+- **File Permissions**: Sensitive files use 0600 permissions
+- **Key Storage**: OS keyring integration with encrypted file fallback
+- **Memory Protection**: Best-effort key zeroization and memory locking
 
 ## Advanced Usage
 

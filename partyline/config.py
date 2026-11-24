@@ -2,28 +2,27 @@
 Secure configuration management with validation and versioning
 """
 
-import os
 import json
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+import os
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
-from pydantic import BaseModel, Field, validator, SecretStr
-from pydantic import IPvAnyAddress, AnyUrl
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field, IPvAnyAddress, SecretStr, validator
 
 from partyline.constants import (
-    Network,
-    CipherSuite,
-    KDFSuite,
     CONFIG_FILE_MODE,
-    DEFAULT_TESTNET_PORT,
     DEFAULT_MAINNET_PORT,
+    DEFAULT_TESTNET_PORT,
     DEFAULT_ZMQ_PORT,
     POLL_INTERVAL_SECONDS,
-    RATE_LIMIT_MESSAGES_PER_MINUTE,
     RATE_LIMIT_BURST,
+    RATE_LIMIT_MESSAGES_PER_MINUTE,
+    CipherSuite,
+    KDFSuite,
+    Network,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,7 +52,7 @@ class NodeConfig(BaseModel):
     
     # Optional settings
     network: Network = Field(default=Network.TESTNET)
-    wallet: Optional[str] = Field(default=None, max_length=100)
+    wallet: str | None = Field(default=None, max_length=100)
     timeout: int = Field(default=30, ge=5, le=300)
     
     # ZMQ settings
@@ -92,12 +91,12 @@ class ProxyConfig(BaseModel):
     type: ProxyType = Field(default=ProxyType.NONE)
     host: IPvAnyAddress = Field(default="127.0.0.1")
     port: int = Field(default=9050, ge=1, le=65535)  # Default Tor SOCKS port
-    username: Optional[str] = Field(default=None, max_length=100)
-    password: Optional[SecretStr] = Field(default=None)
+    username: str | None = Field(default=None, max_length=100)
+    password: SecretStr | None = Field(default=None)
     
     # Tor-specific
     use_tor_dns: bool = Field(default=True)  # Use .onion resolution
-    tor_control_port: Optional[int] = Field(default=9051, ge=1, le=65535)
+    tor_control_port: int | None = Field(default=9051, ge=1, le=65535)
     
     @validator('type')
     def validate_proxy_enabled(cls, v, values):
@@ -106,7 +105,7 @@ class ProxyConfig(BaseModel):
             return ProxyType.SOCKS5H  # Default to SOCKS5H for Tor
         return v
     
-    def get_proxy_url(self) -> Optional[str]:
+    def get_proxy_url(self) -> str | None:
         """Get proxy URL for requests"""
         if not self.enabled:
             return None
@@ -161,10 +160,10 @@ class AppConfig(BaseModel):
     
     # User settings
     nickname: str = Field(default="anonymous", min_length=1, max_length=32)
-    locale: str = Field(default="en_US", regex=r'^[a-z]{2}_[A-Z]{2}$')
+    locale: str = Field(default="en_US", pattern=r'^[a-z]{2}_[A-Z]{2}$')
     
     # Network
-    nodes: List[NodeConfig] = Field(min_items=1)
+    nodes: list[NodeConfig] = Field(min_items=1)
     primary_node_index: int = Field(default=0, ge=0)
     
     # Proxy
@@ -175,7 +174,7 @@ class AppConfig(BaseModel):
     
     # Paths
     data_dir: Path = Field(default_factory=lambda: Path.home() / ".config" / "mempool_partyline")
-    log_file: Optional[Path] = Field(default=None)
+    log_file: Path | None = Field(default=None)
     
     # Behavior
     poll_interval: int = Field(default=POLL_INTERVAL_SECONDS, ge=5, le=300)
@@ -247,7 +246,7 @@ class AppConfig(BaseModel):
         )
     
     @classmethod
-    def load(cls, config_path: Optional[Path] = None) -> 'AppConfig':
+    def load(cls, config_path: Path | None = None) -> 'AppConfig':
         """Load configuration from file or create default"""
         if config_path is None:
             config_path = Path.home() / ".config" / "mempool_partyline" / "config.json"
@@ -291,7 +290,7 @@ class AppConfig(BaseModel):
             nickname="anonymous",
         )
     
-    def save(self, config_path: Optional[Path] = None) -> None:
+    def save(self, config_path: Path | None = None) -> None:
         """Save configuration to file with secure permissions"""
         if config_path is None:
             config_path = self.data_dir / "config.json"
@@ -312,7 +311,7 @@ class AppConfig(BaseModel):
         logger.info(f"Configuration saved to {config_path}")
 
 
-def migrate_config(old_config: Dict[str, Any]) -> Dict[str, Any]:
+def migrate_config(old_config: dict[str, Any]) -> dict[str, Any]:
     """Migrate old configuration format to current version"""
     version = old_config.get('version', 1)
     

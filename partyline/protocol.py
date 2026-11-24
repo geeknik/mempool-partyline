@@ -7,21 +7,21 @@ import hashlib
 import json
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from dataclasses import dataclass
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, validator
 
 from partyline.constants import (
-    PROTOCOL_VERSION,
-    MIN_SUPPORTED_VERSION,
+    LEGACY_PROTOCOL_WARNING,
     LEGACY_VERSION,
-    MessageType,
-    CipherSuite,
-    KDFSuite,
     MAX_MESSAGE_SIZE,
     MESSAGE_TTL_SECONDS,
-    LEGACY_PROTOCOL_WARNING,
+    MIN_SUPPORTED_VERSION,
+    PROTOCOL_VERSION,
+    CipherSuite,
+    KDFSuite,
+    MessageType,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class EnvelopeV2(BaseModel):
     
     version: int = Field(default=PROTOCOL_VERSION, ge=MIN_SUPPORTED_VERSION, le=PROTOCOL_VERSION)
     msg_type: MessageType = Field(default=MessageType.TEXT)
-    sender_id: Optional[str] = Field(default=None, max_length=64)  # Hash of identity key
+    sender_id: str | None = Field(default=None, max_length=64)  # Hash of identity key
     session_id: str = Field(max_length=32)  # Truncated session identifier
     sequence: int = Field(ge=0)
     timestamp: float = Field(default_factory=time.time)
@@ -40,7 +40,7 @@ class EnvelopeV2(BaseModel):
     # Cryptographic parameters
     cipher_suite: CipherSuite
     kdf_suite: KDFSuite
-    kdf_params: Dict[str, Any]  # Salt, iterations, etc.
+    kdf_params: dict[str, Any]  # Salt, iterations, etc.
     
     # Encrypted payload and authentication
     nonce: str  # Hex-encoded nonce
@@ -48,8 +48,8 @@ class EnvelopeV2(BaseModel):
     tag: str  # Hex-encoded authentication tag
     
     # Optional fields
-    ttl: Optional[int] = Field(default=MESSAGE_TTL_SECONDS, ge=0)
-    fragment_info: Optional[Dict[str, Any]] = None  # For fragmented messages
+    ttl: int | None = Field(default=MESSAGE_TTL_SECONDS, ge=0)
+    fragment_info: dict[str, Any] | None = None  # For fragmented messages
     
     @validator('version')
     def validate_version(cls, v):
@@ -132,8 +132,8 @@ class LegacyEnvelope(BaseModel):
     nonce: str
     cipher: str
     tag: str
-    sender: Optional[str] = None
-    timestamp: Optional[float] = None
+    sender: str | None = None
+    timestamp: float | None = None
     
     @classmethod
     def from_bytes(cls, data: bytes) -> Optional['LegacyEnvelope']:
@@ -143,7 +143,7 @@ class LegacyEnvelope(BaseModel):
             # Check for v1 signature
             if 'nonce' in obj and 'cipher' in obj and 'tag' in obj:
                 return cls(**obj)
-        except:
+        except (ValueError, TypeError):
             pass
         return None
     
@@ -182,9 +182,9 @@ class Message:
     timestamp: float
     sender: str = "Unknown"
     msg_type: MessageType = MessageType.TEXT
-    session_id: Optional[str] = None
-    sequence: Optional[int] = None
-    ttl: Optional[int] = None
+    session_id: str | None = None
+    sequence: int | None = None
+    ttl: int | None = None
     
     def formatted(self) -> str:
         """Format message for display"""
@@ -203,29 +203,29 @@ class Message:
 class ProtocolNegotiation(BaseModel):
     """Protocol negotiation for handshake"""
     
-    supported_versions: List[int] = Field(default=[PROTOCOL_VERSION])
-    supported_ciphers: List[CipherSuite] = Field(
+    supported_versions: list[int] = Field(default=[PROTOCOL_VERSION])
+    supported_ciphers: list[CipherSuite] = Field(
         default=[
             CipherSuite.XCHACHA20_POLY1305,
             CipherSuite.AES_256_GCM,
             CipherSuite.AES_256_EAX
         ]
     )
-    supported_kdfs: List[KDFSuite] = Field(
+    supported_kdfs: list[KDFSuite] = Field(
         default=[
             KDFSuite.ARGON2ID,
             KDFSuite.PBKDF2_SHA256
         ]
     )
     
-    def negotiate_version(self, peer_versions: List[int]) -> int:
+    def negotiate_version(self, peer_versions: list[int]) -> int:
         """Negotiate protocol version with peer"""
         common = set(self.supported_versions) & set(peer_versions)
         if not common:
             raise ValueError("No common protocol version")
         return max(common)  # Use highest common version
     
-    def negotiate_cipher(self, peer_ciphers: List[CipherSuite]) -> CipherSuite:
+    def negotiate_cipher(self, peer_ciphers: list[CipherSuite]) -> CipherSuite:
         """Negotiate cipher suite with peer"""
         # Use preference order
         for cipher in self.supported_ciphers:
@@ -233,7 +233,7 @@ class ProtocolNegotiation(BaseModel):
                 return cipher
         raise ValueError("No common cipher suite")
     
-    def negotiate_kdf(self, peer_kdfs: List[KDFSuite]) -> KDFSuite:
+    def negotiate_kdf(self, peer_kdfs: list[KDFSuite]) -> KDFSuite:
         """Negotiate KDF with peer"""
         # Use preference order
         for kdf in self.supported_kdfs:
@@ -264,14 +264,14 @@ def detect_envelope_version(data: bytes) -> int:
             logger.warning(LEGACY_PROTOCOL_WARNING)
             return LEGACY_VERSION
         
-    except:
+    except (ValueError, TypeError):
         pass
     
     # Default to current version
     return PROTOCOL_VERSION
 
 
-def parse_envelope(data: bytes) -> Union[EnvelopeV2, LegacyEnvelope]:
+def parse_envelope(data: bytes) -> EnvelopeV2 | LegacyEnvelope:
     """
     Parse envelope from raw bytes, detecting version
     

@@ -172,3 +172,14 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+# Added by code-review-graph
+.code-review-graph/
+# Added by user tools
+.cursor/
+.gemini/
+.mcp.json
+.qoder/
+.vscode/
+opencode.jsonc
+tests/
+.opencode.jsonc

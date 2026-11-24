@@ -7,18 +7,17 @@ import base64
 import json
 import logging
 import time
-from typing import Optional, Tuple
 
-from Crypto.Cipher import AES
-from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Hash import SHA256
+from Crypto.Cipher import AES  # nosec B413 - AES-only v1 legacy compat
+from Crypto.Hash import SHA256  # nosec B413 - AES-only v1 legacy compat
+from Crypto.Protocol.KDF import PBKDF2  # nosec B413 - deprecated, used only for v1 legacy compat
 
 from partyline.constants import (
     DEFAULT_KDF_ITERATIONS,
     LEGACY_PROTOCOL_WARNING,
 )
-from partyline.protocol import Message
 from partyline.logging_sec import log_security_event
+from partyline.protocol import Message
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +76,9 @@ class LegacyDecryptor:
         nonce_hex: str,
         ciphertext_hex: str,
         tag_hex: str,
-        sender: Optional[str] = None,
-        timestamp: Optional[float] = None
-    ) -> Optional[Message]:
+        sender: str | None = None,
+        timestamp: float | None = None
+    ) -> Message | None:
         """
         Decrypt a legacy v1 message
         
@@ -163,7 +162,7 @@ class LegacyDecryptor:
                 return False
             base64.b64decode(s, validate=True)
             return True
-        except:
+        except Exception:
             return False
 
 
@@ -190,7 +189,7 @@ def detect_legacy_format(data: str) -> bool:
                 logger.warning("Detected legacy v1 message format")
                 return True
                 
-    except:
+    except (ValueError, TypeError):
         pass
     
     return False
@@ -207,6 +206,7 @@ def migrate_legacy_message(legacy_data: dict) -> dict:
         v2-compatible message dictionary
     """
     import hashlib
+
     from partyline.constants import CipherSuite, KDFSuite, MessageType
     
     # Generate session ID from content hash
@@ -252,7 +252,7 @@ class LegacyBridge:
         self.v1_message_count = 0
         self.last_v1_warning = 0
     
-    def process_legacy_envelope(self, data: dict) -> Optional[Message]:
+    def process_legacy_envelope(self, data: dict) -> Message | None:
         """
         Process a legacy v1 envelope
         
@@ -299,7 +299,7 @@ def decrypt_v1_message(
     ciphertext: str,
     tag: str,
     **kwargs
-) -> Optional[Message]:
+) -> Message | None:
     """
     Convenience function to decrypt a single v1 message
     

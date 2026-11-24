@@ -7,9 +7,9 @@ import logging
 import os
 import re
 import sys
-from pathlib import Path
-from typing import Any, Optional
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from typing import Any
 
 from partyline.constants import LOG_FILE_MODE
 
@@ -72,7 +72,7 @@ class SecureFormatter(logging.Formatter):
 
 
 def setup_logging(
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     log_level: str = "INFO",
     console_output: bool = True,
     max_bytes: int = 10 * 1024 * 1024,  # 10MB

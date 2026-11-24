@@ -2,23 +2,23 @@
 Secure configuration management with validation and sanitization
 """
 
+import configparser
 import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, List, Union
-import configparser
+from typing import Any
+
 import yaml
 
-from partyline.crypto.keyring_store import get_keyring_store
-from partyline.crypto.kdf import hkdf_derive, zeroize
-from partyline.security import SecureRandom
 from partyline.constants import (
+    CIPHER_REGISTRY,
     MIN_PASSWORD_LENGTH,
-    SUPPORTED_CIPHERS,
-    SUPPORTED_KDF_ALGORITHMS
 )
+from partyline.crypto.kdf import KDF_REGISTRY, hkdf_derive
+from partyline.crypto.keyring_store import get_keyring_store
 from partyline.logging_sec import log_security_event
+from partyline.security import SecureRandom
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class ConfigValidator:
     
     @staticmethod
     def validate_string(value: Any, min_length: int = 0, max_length: int = 1024, 
-                       allowed_chars: Optional[str] = None) -> str:
+                       allowed_chars: str | None = None) -> str:
         """
         Validate a string value
         
@@ -61,8 +61,8 @@ class ConfigValidator:
         return value
     
     @staticmethod
-    def validate_int(value: Any, min_val: Optional[int] = None, 
-                    max_val: Optional[int] = None) -> int:
+    def validate_int(value: Any, min_val: int | None = None, 
+                    max_val: int | None = None) -> int:
         """Validate an integer value"""
         try:
             int_val = int(value)
@@ -92,7 +92,7 @@ class ConfigValidator:
         raise ValueError(f"Invalid boolean: {value}")
     
     @staticmethod
-    def validate_choice(value: Any, choices: List[Any]) -> Any:
+    def validate_choice(value: Any, choices: list[Any]) -> Any:
         """Validate value is in allowed choices"""
         if value not in choices:
             raise ValueError(f"Invalid choice: {value}. Must be one of {choices}")
@@ -202,14 +202,14 @@ class SecureConfig:
         # Cryptography settings
         "crypto.default_cipher": {
             "type": "choice",
-            "choices": list(SUPPORTED_CIPHERS.keys()),
-            "default": "xchacha20-poly1305",
+            "choices": list(CIPHER_REGISTRY.keys()),
+            "default": "XChaCha20Poly1305",
             "description": "Default encryption cipher"
         },
         "crypto.default_kdf": {
             "type": "choice",
-            "choices": list(SUPPORTED_KDF_ALGORITHMS.keys()),
-            "default": "argon2id",
+            "choices": list(KDF_REGISTRY.keys()),
+            "default": "ARGON2ID",
             "description": "Default key derivation function"
         },
         "crypto.kdf_iterations": {
@@ -305,7 +305,7 @@ class SecureConfig:
         }
     }
     
-    def __init__(self, config_file: Optional[Path] = None, encrypted: bool = False):
+    def __init__(self, config_file: Path | None = None, encrypted: bool = False):
         """
         Initialize secure configuration
         
@@ -315,7 +315,7 @@ class SecureConfig:
         """
         self.config_file = config_file
         self.encrypted = encrypted
-        self.config: Dict[str, Any] = {}
+        self.config: dict[str, Any] = {}
         self.keyring = None
         
         if encrypted:
@@ -434,7 +434,7 @@ class SecureConfig:
         else:
             return value
     
-    def load(self, password: Optional[str] = None):
+    def load(self, password: str | None = None):
         """
         Load configuration from file
         
@@ -481,7 +481,7 @@ class SecureConfig:
             logger.error(f"Failed to load config: {e}")
             raise
     
-    def save(self, password: Optional[str] = None):
+    def save(self, password: str | None = None):
         """
         Save configuration to file
         
@@ -562,7 +562,7 @@ class SecureConfig:
         plaintext = cipher.decrypt(ciphertext, key, nonce, aad=b"config")
         return plaintext
     
-    def _flatten_ini(self, parser: configparser.ConfigParser) -> Dict[str, Any]:
+    def _flatten_ini(self, parser: configparser.ConfigParser) -> dict[str, Any]:
         """Flatten INI sections into dotted keys"""
         result = {}
         for section in parser.sections():
@@ -571,7 +571,7 @@ class SecureConfig:
                 result[full_key] = value
         return result
     
-    def validate_all(self) -> List[str]:
+    def validate_all(self) -> list[str]:
         """
         Validate entire configuration
         
@@ -595,7 +595,7 @@ class SecureConfig:
         
         return errors
     
-    def get_section(self, section: str) -> Dict[str, Any]:
+    def get_section(self, section: str) -> dict[str, Any]:
         """Get all values in a configuration section"""
         result = {}
         prefix = f"{section}."
