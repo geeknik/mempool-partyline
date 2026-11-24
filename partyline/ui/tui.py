@@ -1,9 +1,16 @@
 """Curses-based TUI for Mempool Partyline"""
 
 import curses
+import logging
+import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from enum import IntEnum
+
+from partyline.protocol import EnvelopeV2, parse_envelope
+
+logger = logging.getLogger(__name__)
 
 
 class MessageType(IntEnum):
@@ -108,6 +115,87 @@ class UIState:
     def get_total_messages(self) -> int:
         """Get total message count"""
         return len(self.messages)
+
+    def receive_system_message(self, content: str) -> None:
+        """Append a system notice to the history."""
+        self.messages.append(
+            Message(content=content, sender="system", msg_type=MessageType.SYSTEM)
+        )
+
+
+class MessageQueue:
+    """Thread-safe in-memory message queue."""
+
+    def __init__(self) -> None:
+        self._queue: deque[bytes] = deque()
+        self._lock = threading.Lock()
+
+    def put(self, message: bytes) -> None:
+        """Add a message to the queue."""
+        with self._lock:
+            self._queue.append(message)
+
+    def get(self) -> bytes | None:
+        """Remove and return the oldest message, or None if empty."""
+        with self._lock:
+            if self._queue:
+                return self._queue.popleft()
+            return None
+
+    def peek(self) -> bytes | None:
+        """Return the oldest message without removing it, or None if empty."""
+        with self._lock:
+            return self._queue[0] if self._queue else None
+
+    def clear(self) -> None:
+        """Remove all messages from the queue."""
+        with self._lock:
+            self._queue.clear()
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._queue)
+
+
+class TUIMessageHandler:
+    """Handles incoming messages for the TUI."""
+
+    def __init__(self, queue: MessageQueue, ui_state: UIState) -> None:
+        self.queue = queue
+        self.ui_state = ui_state
+
+    def process_messages(self) -> None:
+        """Process all messages currently in the queue."""
+        while True:
+            msg_bytes = self.queue.get()
+            if msg_bytes is None:
+                break
+            self._handle_message(msg_bytes)
+
+    def _handle_message(self, msg_bytes: bytes) -> None:
+        """Parse protocol envelope and add display message."""
+        try:
+            envelope = parse_envelope(msg_bytes)
+            if isinstance(envelope, EnvelopeV2):
+                msg = envelope
+                if msg.msg_type.name == "TEXT":
+                    display_msg = Message(
+                        content=msg.payload,
+                        sender=msg.sender_id or "anonymous",
+                        msg_type=MessageType.INCOMING,
+                    )
+                    self.ui_state.add_message(display_msg)
+                elif msg.msg_type.name == "HANDSHAKE_RESP":
+                    self.ui_state.receive_system_message(
+                        f"Handshake completed with {msg.sender_id or 'peer'}"
+                    )
+                elif msg.msg_type.name == "HANDSHAKE_INIT":
+                    self.ui_state.receive_system_message(
+                        f"Handshake initiated from {msg.sender_id or 'peer'}"
+                    )
+            # LegacyEnvelope handled by parse_envelope conversion
+        except Exception as e:  # noqa: BLE001 - UI loop must not crash on unexpected input
+            logger.error("Failed to process message: %s", e)
 
 
 class TUI:
