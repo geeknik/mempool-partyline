@@ -58,16 +58,14 @@ def check_security_warnings(config: AppConfig) -> bool:
     primary_node = config.get_primary_node()
 
     # Warn about remote RPC without encryption
-    if str(primary_node.host) not in ['127.0.0.1', 'localhost', '::1']:
-        if not any("remote" in w for w in warnings_shown):
-            logging.warning(REMOTE_RPC_WARNING)
-            warnings_shown.append("remote")
+    if str(primary_node.host) not in ['127.0.0.1', 'localhost', '::1'] and not any("remote" in w for w in warnings_shown):
+        logging.warning(REMOTE_RPC_WARNING)
+        warnings_shown.append("remote")
 
     # Warn about mainnet usage
-    if primary_node.network.value == "mainnet":
-        if not any("mainnet" in w for w in warnings_shown):
-            logging.warning(MAINNET_WARNING)
-            warnings_shown.append("mainnet")
+    if primary_node.network.value == "mainnet" and not any("mainnet" in w for w in warnings_shown):
+        logging.warning(MAINNET_WARNING)
+        warnings_shown.append("mainnet")
 
     return True
 
@@ -106,10 +104,6 @@ def main(argv: list | None = None) -> int:
         ProcessHardening.enable_all()
     except Exception as e:
         logging.warning(f"Security hardening could not be fully applied: {e}")
-
-    # Handle version
-    if args.version:
-        return 0
 
     # Handle setup
     if args.setup:

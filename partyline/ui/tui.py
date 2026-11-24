@@ -296,12 +296,9 @@ class TUI:
                 # Ignore other exceptions, continue loop
                 pass
 
-        # Cleanup
-        if self._colors_ready:
-            curses.nocbreak()
-            self.stdscr.keypad(False)
-            curses.echo()
-            curses.endwin()
+        # Cleanup - curses.wrapper handles cbreak()/nocbreak()/endwin()
+        # when run() is invoked through run_tui(). For standalone use,
+        # the caller is responsible for terminal restoration.
 
 
 def run_tui(nickname: str = "anonymous", network: str = "testnet") -> None:
