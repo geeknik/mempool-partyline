@@ -25,6 +25,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -181,5 +183,7 @@ cython_debug/
 .qoder/
 .vscode/
 opencode.jsonc
+.claude/
+.codebuddy/
 tests/
 .opencode.jsonc
