@@ -236,11 +236,25 @@ class TestTUI:
     def test_tui_send_message(self, mock_stdscr):
         """Test sending a message"""
         tui = TUI(mock_stdscr, init_curses=False)
-        tui.send_message("Hello, world!")
+        with patch("partyline.ui.tui.MessageSender") as mock_sender_cls:
+            mock_sender_cls.return_value.send.return_value = MagicMock(txid="abc123", error=None)
+            tui.send_message("Hello, world!")
         # Should add message to state
         assert len(tui.state.messages) == 1
         assert tui.state.messages[0].content == "Hello, world!"
         assert tui.state.messages[0].msg_type == MessageType.OUTGOING
+
+    def test_tui_send_message_error(self, mock_stdscr):
+        """Test sending a message surfaces transport errors as system message"""
+        tui = TUI(mock_stdscr, init_curses=False)
+        with patch("partyline.ui.tui.MessageSender") as mock_sender_cls:
+            mock_sender_cls.return_value.send.return_value = MagicMock(
+                txid=None, error="RPC connection refused"
+            )
+            tui.send_message("Hello")
+        assert len(tui.state.messages) == 1
+        assert tui.state.messages[0].msg_type == MessageType.SYSTEM
+        assert "RPC connection refused" in tui.state.messages[0].content
 
     def test_tui_send_empty_message(self, mock_stdscr):
         """Test sending empty message is ignored"""

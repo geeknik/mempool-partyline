@@ -8,7 +8,11 @@ from collections import deque
 from dataclasses import dataclass, field
 from enum import IntEnum
 
+from bitcoinrpc.authproxy import JSONRPCException
+
+from partyline.config import AppConfig
 from partyline.protocol import EnvelopeV2, parse_envelope
+from partyline.transport import MessageSender
 
 logger = logging.getLogger(__name__)
 
@@ -340,15 +344,43 @@ class TUI:
             self.state.clear_input()
 
     def send_message(self, text: str) -> None:
-        """Programmatically send a message"""
+        """Programmatically send a message via Bitcoin OP_RETURN."""
         if not text or not text.strip():
             return
-        msg = Message(
-            content=text,
-            sender=self.state.nickname,
-            msg_type=MessageType.OUTGOING,
+
+        # Build shared key for this session (in production use ECDH handshake)
+        config = AppConfig.load()
+        node = config.get_primary_node()
+
+        from partyline.crypto.kdf import hkdf_derive
+
+        key_material = f"partyline:{self.state.nickname}".encode()
+        shared_key = hkdf_derive(key_material, length=32, info=b"mempool-partyline-v2")
+
+        sender = MessageSender(
+            rpc_url=node.get_rpc_url(),
+            fee_rate=1,
+            change_address=None,
         )
-        self.state.add_message(msg)
+
+        try:
+            result = sender.send(
+                message=text,
+                shared_key=shared_key,
+                sender_id=self.state.nickname,
+                session_id="default",
+                sequence=0,
+            )
+            if result.error:
+                logger.error("Send failed: %s", result.error)
+                self.receive_system_message(f"Send error: {result.error}")
+            else:
+                self.state.add_message(
+                    Message(content=text, sender=self.state.nickname, msg_type=MessageType.OUTGOING)
+                )
+        except (JSONRPCException, ConnectionError, TimeoutError, OSError) as e:
+            logger.error("Send error: %s", e)
+            self.receive_system_message(f"Send error: {e}")
 
     def receive_message(self, content: str, sender: str) -> None:
         """Receive a message from another user"""

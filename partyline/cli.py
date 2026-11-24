@@ -6,6 +6,8 @@ import argparse
 import logging
 import sys
 
+from bitcoinrpc.authproxy import JSONRPCException
+
 from partyline.config import AppConfig
 from partyline.constants import MAINNET_WARNING, REMOTE_RPC_WARNING
 from partyline.logging_sec import log_security_event, setup_logging
@@ -126,13 +128,45 @@ def main(argv: list | None = None) -> int:
 
 
 def send_message(message: str) -> int:
-    """Send a message via the mempool"""
-    # TODO: Full message sending implementation
-    # For now, just display the message and exit
-    logger.info("Message prepared: %s", message[:50] + ("..." if len(message) > 50 else ""))
-    print(f"TXID: {message[:20]}...")
-    log_security_event("cli_message_sent", {"message": message[:20]})
-    return 0
+    """Send a message via the mempool."""
+    config = AppConfig.load()
+    node = config.get_primary_node()
+
+    # Build shared key: derive from nickname for now.
+    # In a full implementation, this would come from ECDH handshake or keyring.
+    from partyline.crypto.kdf import hkdf_derive
+
+    key_material = f"partyline:{config.nickname}".encode()
+    shared_key = hkdf_derive(key_material, length=32, info=b"mempool-partyline-v2")
+
+    # Initialize sender
+    from partyline.transport import MessageSender
+
+    sender = MessageSender(
+        rpc_url=node.get_rpc_url(),
+        fee_rate=1,
+        change_address=None,
+    )
+
+    try:
+        result = sender.send(
+            message=message,
+            shared_key=shared_key,
+            sender_id=config.nickname,
+            session_id="default",
+            sequence=0,
+        )
+        if result.error:
+            logger.error("Send failed: %s", result.error)
+            print(f"Error: {result.error}", file=sys.stderr)
+            return 1
+        print(f"TXID: {result.txid}")
+        log_security_event("cli_message_sent", {"txid": result.txid, "message_len": len(message)})
+        return 0
+    except (JSONRPCException, ConnectionError, TimeoutError, OSError) as e:
+        logger.error("Send error: %s", e)
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
