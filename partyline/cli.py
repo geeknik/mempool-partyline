@@ -34,6 +34,11 @@ def create_parser() -> argparse.ArgumentParser:
         help="Send a message (prints TXID on success)",
     )
     parser.add_argument(
+        "--tui",
+        action="store_true",
+        help="Run the curses-based TUI",
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"mempool_partyline {__import__('partyline').__version__}",
@@ -78,6 +83,13 @@ def run_setup() -> int:
     return 0
 
 
+def run_tui() -> int:
+    """Run the curses-based TUI"""
+    from partyline.ui.tui import run_tui as run_tui_curses
+    run_tui_curses()
+    return 0
+
+
 def main(argv: list | None = None) -> int:
     """Main CLI entry point"""
     parser = create_parser()
@@ -102,6 +114,10 @@ def main(argv: list | None = None) -> int:
     # Handle setup
     if args.setup:
         return run_setup()
+
+    # Handle TUI
+    if args.tui:
+        return run_tui()
 
     # Handle send
     if args.send:
