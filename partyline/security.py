@@ -173,12 +173,9 @@ class SecurityManager:
     
     def macos_hardening(self) -> None:
         """macOS-specific hardening"""
-        try:
-            # macOS-specific security measures
-            # Could include entitlements, sandboxing, etc.
-            pass
-        except Exception as e:
-            logger.debug(f"macOS hardening: {e}")
+        # macOS-specific security measures
+        # Could include entitlements, sandboxing, etc.
+        logger.debug("macOS hardening: no additional measures configured")
     
     def windows_hardening(self) -> None:
         """Windows-specific hardening"""

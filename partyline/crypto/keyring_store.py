@@ -383,6 +383,9 @@ class FileBackedStore(KeyringStore):
         os.chmod(self.storage_dir, 0o700)
         
         logger.info(f"Using file-backed key storage at {self.storage_dir}")
+        
+        # Call parent init to check keyring availability
+        super().__init__()
     
     def _get_key_path(self, persona: str) -> Path:
         """Get path for persona key file"""

@@ -1,6 +1,6 @@
 # Mempool Partyline
 
-An anarcho-ephemeral messaging system that uses Bitcoin's mempool for private, encrypted communication.
+An anarcho-ephemeral mempool messaging system with a curses-based TUI.
 
 ## Overview
 

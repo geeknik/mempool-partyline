@@ -531,14 +531,18 @@ class SecureConfig:
     def _encrypt_config(self, data: bytes, password: str) -> bytes:
         """Encrypt configuration data"""
         from partyline.crypto.aead import get_cipher
+        from partyline.constants import NONCE_LENGTH
         
         # Derive key from password
         salt = SecureRandom.get_bytes(16)
         key = hkdf_derive(password.encode(), salt=salt)
         
+        # Get cipher suite and cipher
+        cipher_suite = self.get("crypto.default_cipher")
+        cipher = get_cipher(cipher_suite, key)
+        
         # Encrypt with default cipher
-        cipher = get_cipher(self.get("crypto.default_cipher"))
-        nonce = SecureRandom.get_bytes(cipher.nonce_size)
+        nonce = SecureRandom.get_bytes(NONCE_LENGTH)
         ciphertext = cipher.encrypt(data, key, nonce, aad=b"config")
         
         # Pack: salt || nonce || ciphertext

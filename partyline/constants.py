@@ -43,7 +43,7 @@ CONNECTION_TIMEOUT: Final[int] = 10
 
 # File permissions (octal)
 CONFIG_FILE_MODE: Final[int] = 0o600  # rw-------
-LOG_FILE_MODE: Final[int] = 0o640    # rw-r-----
+LOG_FILE_MODE: Final[int] = 0o600    # rw-------
 KEY_FILE_MODE: Final[int] = 0o600    # rw-------
 
 
