@@ -104,6 +104,10 @@ def main(argv: list | None = None) -> int:
     except Exception as e:  # noqa: BLE001 - startup must not crash on hardening failure
         logger.warning("Security hardening could not be fully applied: %s", e)
 
+    # Load config and check security warnings
+    config = AppConfig.load()
+    check_security_warnings(config)
+
     # Handle setup
     if args.setup:
         return run_setup()
