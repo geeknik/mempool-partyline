@@ -8,15 +8,17 @@ import sys
 
 from partyline.config import AppConfig
 from partyline.constants import MAINNET_WARNING, REMOTE_RPC_WARNING
-from partyline.logging_sec import log_security_event
+from partyline.logging_sec import log_security_event, setup_logging
 from partyline.opsec.hardening import ProcessHardening
+
+logger = logging.getLogger(__name__)
 
 
 def create_parser() -> argparse.ArgumentParser:
     """Create argument parser"""
     parser = argparse.ArgumentParser(
         prog="mempool_partyline",
-        description="Mempool Partyline - Anarcho-ephemeral messaging via Bitcoin mempool"
+        description="Mempool Partyline - Anarcho-ephemeral messaging via Bitcoin mempool",
     )
     parser.add_argument(
         "--setup",
@@ -53,18 +55,18 @@ def create_parser() -> argparse.ArgumentParser:
 
 def check_security_warnings(config: AppConfig) -> bool:
     """Check and warn about insecure configurations"""
-    warnings_shown = []
+    warnings_shown: list[str] = []
 
     primary_node = config.get_primary_node()
 
     # Warn about remote RPC without encryption
     if str(primary_node.host) not in ['127.0.0.1', 'localhost', '::1'] and not any("remote" in w for w in warnings_shown):
-        logging.warning(REMOTE_RPC_WARNING)
+        logger.warning(REMOTE_RPC_WARNING)
         warnings_shown.append("remote")
 
     # Warn about mainnet usage
     if primary_node.network.value == "mainnet" and not any("mainnet" in w for w in warnings_shown):
-        logging.warning(MAINNET_WARNING)
+        logger.warning(MAINNET_WARNING)
         warnings_shown.append("mainnet")
 
     return True
@@ -93,17 +95,14 @@ def main(argv: list | None = None) -> int:
     parser = create_parser()
     args = parser.parse_args(argv)
 
-    # Initialize secure logging
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+    # Initialize secure logging via setup_logging()
+    setup_logging()
 
     # Initialize security hardening
     try:
         ProcessHardening.enable_all()
-    except Exception as e:
-        logging.warning(f"Security hardening could not be fully applied: {e}")
+    except Exception as e:  # noqa: BLE001 - startup must not crash on hardening failure
+        logger.warning("Security hardening could not be fully applied: %s", e)
 
     # Handle setup
     if args.setup:
@@ -126,7 +125,7 @@ def send_message(message: str) -> int:
     """Send a message via the mempool"""
     # TODO: Full message sending implementation
     # For now, just display the message and exit
-    logging.info(f"Message prepared: {message[:50]}{'...' if len(message) > 50 else ''}")
+    logger.info("Message prepared: %s", message[:50] + ("..." if len(message) > 50 else ""))
     print(f"TXID: {message[:20]}...")
     log_security_event("cli_message_sent", {"message": message[:20]})
     return 0
